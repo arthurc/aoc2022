@@ -3,7 +3,6 @@ fn main() {
     calculated_calculated.sort();
     calculated_calculated.reverse();
 
-    for (index, calories) in calculated_calculated.iter().enumerate() {
-        println!("{:>3}. {}", index + 1, calories);
-    }
+    println!("part1: {}", calculated_calculated.first().unwrap_or(&0));
+    println!("part2: {}", calculated_calculated.iter().take(3).sum::<u32>());
 }
