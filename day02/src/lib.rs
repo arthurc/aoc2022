@@ -2,13 +2,41 @@ pub fn calculate_total_score(s: &str) -> u32 {
     s.lines().flat_map(Round::parse).map(|r| r.score()).sum()
 }
 
-#[derive(PartialEq, Debug)]
+pub fn calculate_predicted_score(s: &str) -> u32 {
+    s.lines()
+        .flat_map(parse_hand_and_outcome)
+        .map(|(hand, outcome)| outcome.predict_round(hand).score())
+        .sum()
+}
+
+fn parse_hand_and_outcome(s: &str) -> Option<(Hand, Outcome)> {
+    let mut iter = s.split_ascii_whitespace();
+
+    if let (Some(hand), Some(outcome), None) = (
+        iter.next().and_then(Hand::parse),
+        iter.next().and_then(Outcome::parse),
+        iter.next(),
+    ) {
+        Some((hand, outcome))
+    } else {
+        None
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
 enum Hand {
     Rock,
     Paper,
     Scissors,
 }
 impl Hand {
+    // Table of (X, Y) where "X defeats Y"
+    const DEFEAT_TABLE: &'static [(Hand, Hand)] = &[
+        (Hand::Rock, Hand::Scissors),
+        (Hand::Scissors, Hand::Paper),
+        (Hand::Paper, Hand::Rock),
+    ];
+
     fn parse(s: &str) -> Option<Hand> {
         use Hand::*;
 
@@ -31,13 +59,11 @@ impl Hand {
     }
 
     fn defeats(&self) -> Hand {
-        use Hand::*;
+        Hand::DEFEAT_TABLE.iter().find(|e| e.0 == *self).unwrap().1
+    }
 
-        match self {
-            Rock => Scissors,
-            Scissors => Paper,
-            Paper => Rock,
-        }
+    fn defeated_by(&self) -> Hand {
+        Hand::DEFEAT_TABLE.iter().find(|e| e.1 == *self).unwrap().0
     }
 }
 
@@ -81,6 +107,17 @@ enum Outcome {
     Draw,
 }
 impl Outcome {
+    fn parse(s: &str) -> Option<Self> {
+        use Outcome::*;
+
+        match s {
+            "X" => Some(Loss),
+            "Y" => Some(Draw),
+            "Z" => Some(Win),
+            _ => None,
+        }
+    }
+
     fn score(&self) -> u32 {
         use Outcome::*;
 
@@ -88,6 +125,21 @@ impl Outcome {
             Win => 6,
             Loss => 0,
             Draw => 3,
+        }
+    }
+
+    fn predict_round(&self, opponent_hand: Hand) -> Round {
+        use Outcome::*;
+
+        let response = match self {
+            Draw => opponent_hand,
+            Loss => opponent_hand.defeats(),
+            Win => opponent_hand.defeated_by(),
+        };
+
+        Round {
+            opponent_hand_to_play: opponent_hand,
+            response_to_play: response,
         }
     }
 }
@@ -173,5 +225,59 @@ mod tests {
         assert_eq!(Hand::Scissors, Hand::Rock.defeats());
         assert_eq!(Hand::Paper, Hand::Scissors.defeats());
         assert_eq!(Hand::Rock, Hand::Paper.defeats());
+    }
+
+    #[test]
+    fn test_parse_outcome() {
+        assert_eq!(Some(Outcome::Loss), Outcome::parse("X"));
+        assert_eq!(Some(Outcome::Draw), Outcome::parse("Y"));
+        assert_eq!(Some(Outcome::Win), Outcome::parse("Z"));
+    }
+
+    #[test]
+    fn test_predicted_score_example() {
+        assert_eq!(
+            12,
+            calculate_predicted_score(
+                "
+                A Y
+                B X
+                C Z
+                "
+            )
+        );
+    }
+
+    #[test]
+    fn test_predict_round_win() {
+        assert_eq!(
+            Round {
+                opponent_hand_to_play: Hand::Rock,
+                response_to_play: Hand::Paper
+            },
+            Outcome::Win.predict_round(Hand::Rock)
+        );
+    }
+
+    #[test]
+    fn test_predict_round_draw() {
+        assert_eq!(
+            Round {
+                opponent_hand_to_play: Hand::Scissors,
+                response_to_play: Hand::Scissors
+            },
+            Outcome::Draw.predict_round(Hand::Scissors)
+        );
+    }
+
+    #[test]
+    fn test_predict_round_loss() {
+        assert_eq!(
+            Round {
+                opponent_hand_to_play: Hand::Paper,
+                response_to_play: Hand::Rock
+            },
+            Outcome::Loss.predict_round(Hand::Paper)
+        );
     }
 }
