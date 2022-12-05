@@ -30,13 +30,14 @@ impl Hand {
         }
     }
 
-    fn defeats(&self, other: &Self) -> bool {
+    fn defeats(&self) -> Hand {
         use Hand::*;
 
-        matches!(
-            (self, other),
-            (Rock, Scissors) | (Scissors, Paper) | (Paper, Rock)
-        )
+        match self {
+            Rock => Scissors,
+            Scissors => Paper,
+            Paper => Rock,
+        }
     }
 }
 
@@ -65,7 +66,7 @@ impl Round {
     fn outcome(&self) -> Outcome {
         if self.opponent_hand_to_play == self.response_to_play {
             Outcome::Draw
-        } else if self.response_to_play.defeats(&self.opponent_hand_to_play) {
+        } else if self.response_to_play.defeats() == self.opponent_hand_to_play {
             Outcome::Win
         } else {
             Outcome::Loss
@@ -169,8 +170,8 @@ mod tests {
 
     #[test]
     fn test_defeats() {
-        assert!(Hand::Rock.defeats(&Hand::Scissors));
-        assert!(Hand::Scissors.defeats(&Hand::Paper));
-        assert!(Hand::Paper.defeats(&Hand::Rock));
+        assert_eq!(Hand::Scissors, Hand::Rock.defeats());
+        assert_eq!(Hand::Paper, Hand::Scissors.defeats());
+        assert_eq!(Hand::Rock, Hand::Paper.defeats());
     }
 }
